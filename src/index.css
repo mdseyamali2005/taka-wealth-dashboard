@@ -4,52 +4,50 @@
 
 @layer base {
   :root {
-    --background: 216 28% 7%;
-    --foreground: 0 0% 95%;
+    /* Premium Warm Light Theme Base */
+    --background: 60 14% 98%; /* #FAFAF8 */
+    --foreground: 0 0% 10%; /* #1A1A1A */
 
-    --card: 215 19% 11%;
-    --card-foreground: 0 0% 95%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
 
-    --popover: 215 19% 11%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
 
-    --primary: 41 100% 47%;
-    --primary-foreground: 216 28% 7%;
+    /* Brand Primary - Deep Rich Blue/Slate */
+    --primary: 222 47% 25%;
+    --primary-foreground: 60 14% 98%;
 
-    --secondary: 215 15% 16%;
-    --secondary-foreground: 0 0% 85%;
+    --secondary: 210 20% 90%;
+    --secondary-foreground: 222 47% 25%;
 
-    --muted: 215 15% 16%;
-    --muted-foreground: 215 10% 55%;
+    --muted: 210 20% 94%;
+    --muted-foreground: 215 15% 40%;
 
-    --accent: 41 100% 47%;
-    --accent-foreground: 216 28% 7%;
+    --accent: 210 20% 90%;
+    --accent-foreground: 222 47% 25%;
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 84% 45%;
+    --destructive-foreground: 60 14% 98%;
 
-    --border: 215 15% 20%;
-    --input: 215 15% 20%;
-    --ring: 41 100% 47%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 222 47% 25%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
-    --gold: 41 100% 47%;
-    --gold-dim: 41 60% 35%;
-    --navy: 216 28% 7%;
-    --navy-light: 215 19% 11%;
-    --success: 142 70% 45%;
-    --warning: 38 92% 50%;
-    --danger: 0 72% 51%;
+    --success: 142 70% 35%;
+    --warning: 38 92% 40%;
+    --danger: 0 84% 45%;
 
-    --sidebar-background: 215 19% 9%;
-    --sidebar-foreground: 0 0% 85%;
-    --sidebar-primary: 41 100% 47%;
-    --sidebar-primary-foreground: 216 28% 7%;
-    --sidebar-accent: 215 15% 16%;
-    --sidebar-accent-foreground: 0 0% 90%;
-    --sidebar-border: 215 15% 18%;
-    --sidebar-ring: 41 100% 47%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 0 0% 20%;
+    --sidebar-primary: 222 47% 25%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 20% 90%;
+    --sidebar-accent-foreground: 222 47% 25%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 222 47% 25%;
   }
 }
 
@@ -69,28 +67,6 @@
 }
 
 @layer utilities {
-  .gold-glow {
-    box-shadow: 0 0 20px -5px hsl(41 100% 47% / 0.3), 0 10px 30px -10px hsl(41 100% 47% / 0.15);
-  }
-
-  .gold-glow-sm {
-    box-shadow: 0 0 10px -3px hsl(41 100% 47% / 0.2);
-  }
-
-  .grain-overlay {
-    position: relative;
-  }
-
-  .grain-overlay::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    opacity: 0.03;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 1;
-  }
-
   .page-transition {
     animation: fadeIn 0.3s ease-out;
   }

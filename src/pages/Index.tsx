@@ -9,20 +9,78 @@ import {
   type Expense, type Budget,
   loadExpenses, saveExpenses, loadBudget, saveBudget,
 } from "@/lib/finance-utils";
+import { toast } from "sonner";
 
 export default function Index() {
   const [page, setPage] = useState<Page>("dashboard");
-  const [expenses, setExpenses] = useState<Expense[]>(loadExpenses);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budget, setBudget] = useState<Budget>(loadBudget);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => saveExpenses(expenses), [expenses]);
+  // Fetch from MS SQL Backend
+  useEffect(() => {
+    fetch('http://localhost:3000/api/transactions')
+      .then(res => {
+        if (!res.ok) throw new Error("Backend error");
+        return res.json();
+      })
+      .then(data => {
+         const formatted = data.map((t: any) => ({
+           id: String(t.id),
+           amount: t.amount,
+           category: t.description.split(' - ')[0] || 'Other',
+           note: t.description.split(' - ')[1] || t.description,
+           date: t.date.split('T')[0],
+           createdAt: new Date(t.date).getTime()
+         }));
+         setExpenses(formatted);
+         setLoading(false);
+      })
+      .catch((err) => {
+         console.log("Using local storage fallback. Ensure backend is running.", err);
+         setExpenses(loadExpenses());
+         setLoading(false);
+      });
+  }, []);
+
+  // Save budget to local storage
   useEffect(() => saveBudget(budget), [budget]);
+  
+  // Save expenses to local storage as backup
+  useEffect(() => saveExpenses(expenses), [expenses]);
 
-  const addExpense = useCallback((e: Expense) => {
+  const addExpense = useCallback(async (e: Expense) => {
+    try {
+      const res = await fetch('http://localhost:3000/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: e.amount,
+          description: `${e.category} - ${e.note}`,
+          type: 'expense',
+          date: e.date
+        })
+      });
+      if (res.ok) {
+        const t = await res.json();
+        const newExp = { ...e, id: String(t.id) };
+        setExpenses((prev) => [...prev, newExp]);
+        toast.success("Saved to database!");
+        return;
+      }
+    } catch {
+      console.warn("Backend unavailable, saving locally");
+    }
+    // Fallback
     setExpenses((prev) => [...prev, e]);
   }, []);
 
-  const deleteExpense = useCallback((id: string) => {
+  const deleteExpense = useCallback(async (id: string) => {
+    try {
+      await fetch(`http://localhost:3000/api/transactions/${id}`, { method: 'DELETE' });
+    } catch {
+      console.warn("Backend unavailable for deletion");
+    }
     setExpenses((prev) => prev.filter((e) => e.id !== id));
   }, []);
 
@@ -31,6 +89,8 @@ export default function Index() {
   }, []);
 
   const renderPage = () => {
+    if (loading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Connecting to database...</div>;
+    
     switch (page) {
       case "dashboard":
         return <Dashboard expenses={expenses} budget={budget.monthly} onNavigate={setPage} />;
@@ -46,7 +106,7 @@ export default function Index() {
   };
 
   return (
-    <div className="flex min-h-screen bg-background grain-overlay">
+    <div className="flex min-h-screen bg-background">
       <Navigation current={page} onChange={setPage} />
       <main className="flex-1 p-4 md:p-8 pb-20 md:pb-8 overflow-auto">
         {renderPage()}
