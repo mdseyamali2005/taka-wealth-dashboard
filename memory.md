@@ -129,3 +129,10 @@ e:\taka-wealth-dashboard\
 - **Stripe API removed:** Replaced with **SSLCommerz** for Bangladesh support (bKash, Nagad)
 - **Prisma Schema updated:** `stripeCustomerId` → `paymentCustomerId`
 - **Build:** `vite build` ✅ PASSED (3.88s)
+
+### 2026-05-09 — Voice Processing & UX Stability 🎤
+- **Robust Error Handling:** Replaced generic "Voice processing failed" with specific backend error validation (API keys, audio buffer, Whisper/Claude status).
+- **MIME Type Compatibility:** Added fallback logic for `MediaRecorder` to support multiple audio formats across different browsers/OS.
+- **Frontend Validation:** Added recording length checks and `res.ok` validation for better UX and error reporting.
+- **Git Sync:** Pushed latest stability fixes to main branch.
+- **Build:** `vite build` ✅ PASSED (4.08s)
