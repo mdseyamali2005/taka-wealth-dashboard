@@ -46,17 +46,21 @@ export default function authRoutes(prisma: any) {
       // Log registration activity & get device info
       const deviceInfo = await recordLoginActivity(prisma, user.id, user.email, 'register', req);
 
-      // Save session to database
+      // Save session to database (wrapped in try-catch so it doesn't block login if it fails)
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30); // Match 30d JWT expiry
-      await prisma.session.create({
-        data: {
-          userId: user.id,
-          token,
-          expiresAt,
-          ...deviceInfo
-        },
-      });
+      try {
+        await prisma.session.create({
+          data: {
+            userId: user.id,
+            token,
+            expiresAt,
+            ...deviceInfo
+          },
+        });
+      } catch (sessionErr) {
+        console.error('Session creation failed, but proceeding with login:', sessionErr);
+      }
 
       res.status(201).json({
         token,
@@ -101,17 +105,21 @@ export default function authRoutes(prisma: any) {
       // Log login activity & get device info
       const deviceInfo = await recordLoginActivity(prisma, user.id, user.email, 'email', req);
 
-      // Save session to database
+      // Save session to database (wrapped in try-catch so it doesn't block login if it fails)
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30); // Match 30d JWT expiry
-      await prisma.session.create({
-        data: {
-          userId: user.id,
-          token,
-          expiresAt,
-          ...deviceInfo
-        },
-      });
+      try {
+        await prisma.session.create({
+          data: {
+            userId: user.id,
+            token,
+            expiresAt,
+            ...deviceInfo
+          },
+        });
+      } catch (sessionErr) {
+        console.error('Session creation failed, but proceeding with login:', sessionErr);
+      }
 
       res.json({
         token,
@@ -189,17 +197,21 @@ export default function authRoutes(prisma: any) {
       // Log Google login activity & get device info
       const deviceInfo = await recordLoginActivity(prisma, user.id, user.email, 'google', req);
 
-      // Save session to database
+      // Save session to database (wrapped in try-catch so it doesn't block login if it fails)
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30); // Match 30d JWT expiry
-      await prisma.session.create({
-        data: {
-          userId: user.id,
-          token,
-          expiresAt,
-          ...deviceInfo
-        },
-      });
+      try {
+        await prisma.session.create({
+          data: {
+            userId: user.id,
+            token,
+            expiresAt,
+            ...deviceInfo
+          },
+        });
+      } catch (sessionErr) {
+        console.error('Session creation failed, but proceeding with login:', sessionErr);
+      }
 
       res.json({
         token,
