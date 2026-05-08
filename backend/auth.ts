@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { OAuth2Client } from 'google-auth-library';
 import { AuthRequest, requireAuth, generateToken } from './middleware.js';
+import { recordLoginActivity } from './login-logger.js';
 
 const router = Router();
 
@@ -41,6 +42,10 @@ export default function authRoutes(prisma: any) {
       });
 
       const token = generateToken(user.id, user.email);
+
+      // Log registration activity
+      recordLoginActivity(prisma, user.id, user.email, 'register', req);
+
       res.status(201).json({
         token,
         user: {
@@ -80,6 +85,10 @@ export default function authRoutes(prisma: any) {
       }
 
       const token = generateToken(user.id, user.email);
+
+      // Log login activity
+      recordLoginActivity(prisma, user.id, user.email, 'email', req);
+
       res.json({
         token,
         user: {
@@ -152,6 +161,10 @@ export default function authRoutes(prisma: any) {
       }
 
       const token = generateToken(user.id, user.email);
+
+      // Log Google login activity
+      recordLoginActivity(prisma, user.id, user.email, 'google', req);
+
       res.json({
         token,
         user: {
@@ -193,6 +206,33 @@ export default function authRoutes(prisma: any) {
     } catch (error) {
       console.error('Get user error:', error);
       res.status(500).json({ error: 'Failed to get user info' });
+    }
+  });
+
+  // ─── Login Activity History ────────────────────────────────────
+  router.get('/login-activity', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const logs = await prisma.loginLog.findMany({
+        where: { userId: req.userId },
+        orderBy: { createdAt: 'desc' },
+        take: 50, // Last 50 logins
+        select: {
+          id: true,
+          email: true,
+          ip: true,
+          location: true,
+          device: true,
+          browser: true,
+          os: true,
+          loginMethod: true,
+          createdAt: true,
+        },
+      });
+
+      res.json(logs);
+    } catch (error) {
+      console.error('Login activity error:', error);
+      res.status(500).json({ error: 'Failed to fetch login activity' });
     }
   });
 

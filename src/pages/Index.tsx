@@ -6,6 +6,7 @@ import ExpenseHistory from "@/components/finance/ExpenseHistory";
 import MonthlyReport from "@/components/finance/MonthlyReport";
 import BudgetManager from "@/components/finance/BudgetManager";
 import AIChatSidebar from "@/components/finance/AIChatSidebar";
+import LoginActivity from "@/components/finance/LoginActivity";
 import Pricing from "@/pages/Pricing";
 import {
   type Expense, type Budget,
@@ -127,6 +128,8 @@ export default function Index() {
             onUpgrade={() => setPage("pricing")}
           />
         );
+      case "activity":
+        return <LoginActivity />;
       case "pricing":
         return <Pricing onNavigate={setPage} />;
     }

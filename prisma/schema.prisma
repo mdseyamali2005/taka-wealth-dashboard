@@ -24,6 +24,7 @@ model User {
   transactions       Transaction[]
   sessions           Session[]
   chatMessages       ChatMessage[]
+  loginLogs          LoginLog[]
 }
 
 model Transaction {
@@ -52,4 +53,19 @@ model ChatMessage {
   role      String   // "user" | "assistant"
   content   String   @db.NVarChar(Max)
   createdAt DateTime @default(now())
+}
+
+model LoginLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  email       String
+  ip          String
+  location    String?  // "Dhaka, Bangladesh" from IP geolocation
+  device      String?  // "Desktop", "Mobile", "Tablet"
+  browser     String?  // "Chrome 125", "Firefox 130"
+  os          String?  // "Windows 11", "Android 14", "macOS 15"
+  userAgent   String?  @db.NVarChar(Max)
+  loginMethod String   // "email" | "google" | "register"
+  createdAt   DateTime @default(now())
 }

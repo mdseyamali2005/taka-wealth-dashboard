@@ -34,13 +34,14 @@ It allows users to track expenses, set budgets, view reports, and get AI-powered
 e:\taka-wealth-dashboard\
 ├── backend/
 │   ├── server.ts          # Express server entry point
-│   ├── auth.ts            # Auth routes (register, login, Google OAuth)
+│   ├── auth.ts            # Auth routes (register, login, Google OAuth, login-activity)
 │   ├── chat.ts            # AI chat routes (Claude + Whisper voice)
-│   ├── subscription.ts    # Stripe subscription routes
+│   ├── login-logger.ts    # Login activity logger + IP geolocation + email alerts
+│   ├── subscription.ts    # SSLCommerz subscription routes
 │   └── middleware.ts       # JWT auth & subscription middleware
 ├── prisma/
 │   └── schema.prisma      # Database models (User, Transaction, Session, ChatMessage)
-├── src/z
+├── src/
 │   ├── App.tsx            # Root component with routing & auth provider
 │   ├── main.tsx           # Vite entry
 │   ├── index.css          # Global Tailwind styles & design tokens
@@ -52,7 +53,8 @@ e:\taka-wealth-dashboard\
 │   │   │   ├── ExpenseHistory.tsx  # Expense list with filters
 │   │   │   ├── MonthlyReport.tsx   # Charts & monthly summary
 │   │   │   ├── BudgetManager.tsx   # Budget setting & tracking
-│   │   │   └── AIChatSidebar.tsx   # AI chat + voice input (Pro feature)
+│   │   │   ├── AIChatSidebar.tsx   # AI chat + voice input (Pro feature)
+│   │   │   └── LoginActivity.tsx   # Facebook-style login activity log
 │   │   └── ui/                     # shadcn/ui components
 │   ├── lib/
 │   │   ├── utils.ts           # General utilities
@@ -86,9 +88,11 @@ e:\taka-wealth-dashboard\
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | Google Cloud Console |
 | `ANTHROPIC_API_KEY` | Claude API key | console.anthropic.com |
 | `OPENAI_API_KEY` | Whisper STT API key | platform.openai.com |
-| `STRIPE_SECRET_KEY` | Stripe secret key | Stripe Dashboard |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing | Stripe CLI / Dashboard |
-| `STRIPE_PRICE_ID` | Monthly plan price ID | Stripe Dashboard |
+| `SMTP_HOST` | SMTP server host | `smtp.gmail.com` for Gmail |
+| `SMTP_PORT` | SMTP port | `587` for TLS |
+| `SMTP_USER` | SMTP username/email | Your Gmail address |
+| `SMTP_PASS` | SMTP password | Gmail App Password (16-char) |
+| `SMTP_FROM` | Sender email | Same as SMTP_USER |
 | `VITE_GOOGLE_CLIENT_ID` | Google client ID (frontend) | Same as GOOGLE_CLIENT_ID |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key | Stripe Dashboard |
 
@@ -107,6 +111,8 @@ e:\taka-wealth-dashboard\
 | AI Chat (Text) | ✅ Done | Hybrid: local parser (FREE) + Claude 3.5 Haiku fallback |
 | AI Chat (Voice) | ✅ Done | Bangla voice via OpenAI Whisper STT |
 | SSLCommerz Subscription | ✅ Fixed | Replaced with SSLCommerz (bKash, Nagad) for BD |
+| Login Activity Log | ✅ Done | Facebook-style device/IP/location tracking |
+| Login Email Alerts | ✅ Done | Sends email on every new login (nodemailer SMTP) |
 | CSV Export | ✅ Done | Download expenses as CSV |
 | Local Storage Fallback | ✅ Done | Works offline |
 
@@ -136,3 +142,15 @@ e:\taka-wealth-dashboard\
 - **Frontend Validation:** Added recording length checks and `res.ok` validation for better UX and error reporting.
 - **Git Sync:** Pushed latest stability fixes to main branch.
 - **Build:** `vite build` ✅ PASSED (4.08s)
+
+### 2026-05-09 — Login Activity & Security Alerts 🔐
+- **Prisma Schema:** Added `LoginLog` model (separate table — IP, device, browser, OS, location, loginMethod)
+- **Login Logger:** New `backend/login-logger.ts` — parses User-Agent, fetches IP geolocation (ip-api.com), sends email alerts (nodemailer)
+- **Auth Updated:** `auth.ts` now logs every register, login, and Google sign-in event
+- **Login Activity API:** `GET /api/auth/login-activity` returns last 50 login events
+- **Frontend Page:** New `LoginActivity.tsx` — premium UI with device icons, method badges, active session indicator, security tips
+- **Navigation:** Added "Activity" tab with Shield icon
+- **Email Alerts:** Beautiful HTML email on every login (device, IP, location, method, time)
+- **Dependencies:** Added `nodemailer` + `@types/nodemailer`
+- **Env:** Added `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` to `.env.example`
+- **Build:** `vite build` ✅ PASSED (3.72s)

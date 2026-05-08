@@ -1,7 +1,7 @@
-import { LayoutDashboard, PlusCircle, List, BarChart3, Wallet, MessageSquare, Lock, LogOut, Crown } from "lucide-react";
+import { LayoutDashboard, PlusCircle, List, BarChart3, Wallet, MessageSquare, Shield, Lock, LogOut, Crown } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
-export type Page = "dashboard" | "add" | "history" | "report" | "budget" | "chat" | "pricing";
+export type Page = "dashboard" | "add" | "history" | "report" | "budget" | "chat" | "activity" | "pricing";
 
 const NAV_ITEMS: { page: Page; label: string; icon: React.ElementType; pro?: boolean }[] = [
   { page: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -10,6 +10,7 @@ const NAV_ITEMS: { page: Page; label: string; icon: React.ElementType; pro?: boo
   { page: "report", label: "Reports", icon: BarChart3 },
   { page: "budget", label: "Budget", icon: Wallet },
   { page: "chat", label: "AI Chat", icon: MessageSquare, pro: true },
+  { page: "activity", label: "Activity", icon: Shield },
 ];
 
 interface Props {
