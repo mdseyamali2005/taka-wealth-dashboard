@@ -43,6 +43,9 @@ export default function authRoutes(prisma: any) {
 
       const token = generateToken(user.id, user.email);
 
+      // Log registration activity & get device info
+      const deviceInfo = await recordLoginActivity(prisma, user.id, user.email, 'register', req);
+
       // Save session to database
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30); // Match 30d JWT expiry
@@ -51,11 +54,9 @@ export default function authRoutes(prisma: any) {
           userId: user.id,
           token,
           expiresAt,
+          ...deviceInfo
         },
       });
-
-      // Log registration activity
-      recordLoginActivity(prisma, user.id, user.email, 'register', req);
 
       res.status(201).json({
         token,
@@ -97,6 +98,9 @@ export default function authRoutes(prisma: any) {
 
       const token = generateToken(user.id, user.email);
 
+      // Log login activity & get device info
+      const deviceInfo = await recordLoginActivity(prisma, user.id, user.email, 'email', req);
+
       // Save session to database
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30); // Match 30d JWT expiry
@@ -105,11 +109,9 @@ export default function authRoutes(prisma: any) {
           userId: user.id,
           token,
           expiresAt,
+          ...deviceInfo
         },
       });
-
-      // Log login activity
-      recordLoginActivity(prisma, user.id, user.email, 'email', req);
 
       res.json({
         token,
@@ -184,6 +186,9 @@ export default function authRoutes(prisma: any) {
 
       const token = generateToken(user.id, user.email);
 
+      // Log Google login activity & get device info
+      const deviceInfo = await recordLoginActivity(prisma, user.id, user.email, 'google', req);
+
       // Save session to database
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30); // Match 30d JWT expiry
@@ -192,11 +197,9 @@ export default function authRoutes(prisma: any) {
           userId: user.id,
           token,
           expiresAt,
+          ...deviceInfo
         },
       });
-
-      // Log Google login activity
-      recordLoginActivity(prisma, user.id, user.email, 'google', req);
 
       res.json({
         token,
@@ -215,7 +218,7 @@ export default function authRoutes(prisma: any) {
   });
 
   // ─── Get Current User ──────────────────────────────────────────
-  router.get('/me', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  router.get('/me', requireAuth(prisma), async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const user = await prisma.user.findUnique({
         where: { id: req.userId },
@@ -243,7 +246,7 @@ export default function authRoutes(prisma: any) {
   });
 
   // ─── Login Activity History ────────────────────────────────────
-  router.get('/login-activity', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  router.get('/login-activity', requireAuth(prisma), async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const logs = await prisma.loginLog.findMany({
         where: { userId: req.userId },
@@ -269,8 +272,44 @@ export default function authRoutes(prisma: any) {
     }
   });
 
+  // ─── Active Sessions (Where you're logged in) ────────────────
+  router.get('/sessions', requireAuth(prisma), async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const sessions = await prisma.session.findMany({
+        where: { userId: req.userId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          ip: true,
+          location: true,
+          device: true,
+          browser: true,
+          os: true,
+          createdAt: true,
+          // exclude token for security
+        }
+      });
+      res.json(sessions);
+    } catch (error) {
+      console.error('Session fetch error:', error);
+      res.status(500).json({ error: 'Failed to fetch sessions' });
+    }
+  });
+
+  router.delete('/sessions/:id', requireAuth(prisma), async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      await prisma.session.delete({
+        where: { id: req.params.id, userId: req.userId },
+      });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Session delete error:', error);
+      res.status(500).json({ error: 'Failed to revoke session' });
+    }
+  });
+
   // ─── Logout (client-side token removal, but we can track) ─────
-  router.post('/logout', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  router.post('/logout', requireAuth(prisma), async (req: AuthRequest, res: Response): Promise<void> => {
     // JWT is stateless, so client just deletes the token
     // But we can invalidate sessions if needed in the future
     res.json({ success: true, message: 'Logged out successfully' });

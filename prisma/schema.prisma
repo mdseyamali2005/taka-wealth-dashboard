@@ -42,6 +42,11 @@ model Session {
   userId    Int
   user      User     @relation(fields: [userId], references: [id])
   token     String   @unique
+  ip        String?
+  location  String?
+  device    String?
+  browser   String?
+  os        String?
   expiresAt DateTime
   createdAt DateTime @default(now())
 }

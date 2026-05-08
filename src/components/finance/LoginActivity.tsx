@@ -19,6 +19,16 @@ interface LoginEntry {
   createdAt: string;
 }
 
+interface SessionEntry {
+  id: string;
+  ip: string | null;
+  location: string | null;
+  device: string | null;
+  browser: string | null;
+  os: string | null;
+  createdAt: string;
+}
+
 // Device icon helper
 function getDeviceIcon(device: string | null) {
   switch (device?.toLowerCase()) {
@@ -69,17 +79,23 @@ function formatDateTime(dateStr: string): string {
 export default function LoginActivity() {
   const authFetch = useAuthFetch();
   const [logs, setLogs] = useState<LoginEntry[]>([]);
+  const [sessions, setSessions] = useState<SessionEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchLogs = async () => {
+  const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await authFetch(`${API_BASE}/auth/login-activity`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      setLogs(data);
+      const [logsRes, sessionsRes] = await Promise.all([
+        authFetch(`${API_BASE}/auth/login-activity`),
+        authFetch(`${API_BASE}/auth/sessions`)
+      ]);
+
+      if (!logsRes.ok || !sessionsRes.ok) throw new Error("Failed to fetch");
+      
+      setLogs(await logsRes.json());
+      setSessions(await sessionsRes.json());
     } catch {
       setError("Could not load login activity. Make sure backend is running.");
     } finally {
@@ -88,8 +104,19 @@ export default function LoginActivity() {
   };
 
   useEffect(() => {
-    fetchLogs();
+    fetchData();
   }, []); // eslint-disable-line
+
+  const handleRevokeSession = async (id: string) => {
+    try {
+      const res = await authFetch(`${API_BASE}/auth/sessions/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setSessions(prev => prev.filter(s => s.id !== id));
+      }
+    } catch (err) {
+      console.error('Failed to revoke session:', err);
+    }
+  };
 
   // First entry is the current session
   const currentSession = logs.length > 0 ? logs[0] : null;
@@ -109,7 +136,7 @@ export default function LoginActivity() {
           </div>
         </div>
         <button
-          onClick={fetchLogs}
+          onClick={fetchData}
           disabled={loading}
           className="p-2.5 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all disabled:opacity-50"
           title="Refresh"
@@ -137,10 +164,10 @@ export default function LoginActivity() {
 
       {/* Error State */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-5 text-center">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-5 text-center mb-6">
           <ShieldAlert size={28} className="mx-auto mb-2 text-red-400" />
           <p className="text-sm text-red-300">{error}</p>
-          <button onClick={fetchLogs} className="mt-3 text-xs text-red-400 underline hover:text-red-300">
+          <button onClick={fetchData} className="mt-3 text-xs text-red-400 underline hover:text-red-300">
             Try again
           </button>
         </div>
@@ -165,11 +192,30 @@ export default function LoginActivity() {
         </div>
       )}
 
+      {/* Active Sessions (Where you're logged in) */}
+      {!loading && sessions.length > 0 && (
+        <div className="mb-6">
+          <p className="text-xs font-semibold text-emerald-500/80 uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
+            Where you're logged in
+          </p>
+          <div className="space-y-3">
+            {sessions.map((session, index) => (
+              <SessionCard 
+                key={session.id} 
+                session={session} 
+                isCurrent={index === 0} // Approximate current session by recency
+                onRevoke={() => handleRevokeSession(session.id)} 
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Past Sessions */}
       {!loading && pastSessions.length > 0 && (
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">
-            Recent Activity — {pastSessions.length} login{pastSessions.length !== 1 ? "s" : ""}
+            Login History — {pastSessions.length} record{pastSessions.length !== 1 ? "s" : ""}
           </p>
           <div className="space-y-3">
             {pastSessions.map((entry) => (
@@ -272,6 +318,92 @@ function LoginCard({ entry, isCurrent }: { entry: LoginEntry; isCurrent?: boolea
             {formatDateTime(entry.createdAt)}
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Individual Session Card ─────────────────────────────────────
+function SessionCard({ session, isCurrent, onRevoke }: { session: SessionEntry; isCurrent?: boolean; onRevoke: () => void }) {
+  const DeviceIcon = getDeviceIcon(session.device);
+
+  return (
+    <div
+      className={`bg-card border rounded-xl p-4 transition-all hover:shadow-md ${
+        isCurrent
+          ? "border-emerald-500/30 shadow-sm shadow-emerald-500/5"
+          : "border-border hover:border-border/80"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
+          {/* Device Icon */}
+          <div
+            className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+              isCurrent
+                ? "bg-emerald-500/10 text-emerald-400"
+                : "bg-secondary text-muted-foreground"
+            }`}
+          >
+            <DeviceIcon size={20} />
+          </div>
+
+          {/* Details */}
+          <div className="flex-1 min-w-0">
+            {/* Top row: Device + Time */}
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-foreground">
+                  {session.os || "Unknown OS"}
+                </span>
+                {isCurrent && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 uppercase tracking-wider">
+                    Current Device
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Browser */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mb-2">
+              {session.browser && (
+                <span className="flex items-center gap-1">
+                  <Chrome size={11} />
+                  {session.browser}
+                </span>
+              )}
+            </div>
+
+            {/* IP + Location */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground/70">
+              <span className="flex items-center gap-1">
+                <Wifi size={11} />
+                {session.ip}
+              </span>
+              {session.location && (
+                <span className="flex items-center gap-1">
+                  <MapPin size={11} />
+                  {session.location}
+                </span>
+              )}
+            </div>
+
+            {/* Full timestamp tooltip */}
+            <p className="text-[10px] text-muted-foreground/40 mt-1.5">
+              Logged in: {formatDateTime(session.createdAt)}
+            </p>
+          </div>
+        </div>
+        
+        {/* Revoke Action */}
+        {!isCurrent && (
+          <button
+            onClick={onRevoke}
+            className="text-xs font-medium text-red-400 hover:text-red-300 px-3 py-1.5 rounded-lg border border-red-500/20 hover:bg-red-500/10 transition-colors"
+          >
+            Log out
+          </button>
+        )}
       </div>
     </div>
   );

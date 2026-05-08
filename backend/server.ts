@@ -60,7 +60,7 @@ app.use('/api/chat', chatRoutes(prisma));
 app.use('/api/subscription', subscriptionRoutes(prisma));
 
 // ─── Transaction Routes (now auth-protected) ────────────────────
-app.get('/api/transactions', requireAuth, async (req: AuthRequest, res: Response) => {
+app.get('/api/transactions', requireAuth(prisma), async (req: AuthRequest, res: Response) => {
   try {
     const transactions = await prisma.transaction.findMany({
       where: { userId: req.userId },
@@ -73,7 +73,7 @@ app.get('/api/transactions', requireAuth, async (req: AuthRequest, res: Response
   }
 });
 
-app.post('/api/transactions', requireAuth, async (req: AuthRequest, res: Response) => {
+app.post('/api/transactions', requireAuth(prisma), async (req: AuthRequest, res: Response) => {
   try {
     const { amount, description, type, date } = req.body;
 
@@ -93,7 +93,7 @@ app.post('/api/transactions', requireAuth, async (req: AuthRequest, res: Respons
   }
 });
 
-app.delete('/api/transactions/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+app.delete('/api/transactions/:id', requireAuth(prisma), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     // Ensure user can only delete their own transactions

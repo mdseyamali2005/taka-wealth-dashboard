@@ -100,7 +100,7 @@ export default function chatRoutes(prisma: any) {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   // ─── Send Text Message ────────────────────────────────────────
-  router.post('/message', requireAuth, requireSubscription(prisma), async (req: AuthRequest, res: Response): Promise<void> => {
+  router.post('/message', requireAuth(prisma), requireSubscription(prisma), async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { message } = req.body;
       if (!message || !message.trim()) {
@@ -211,7 +211,7 @@ export default function chatRoutes(prisma: any) {
   });
 
   // ─── Voice Message (Whisper STT → Claude) ─────────────────────
-  router.post('/voice', requireAuth, requireSubscription(prisma), upload.single('audio'), async (req: AuthRequest, res: Response): Promise<void> => {
+  router.post('/voice', requireAuth(prisma), requireSubscription(prisma), upload.single('audio'), async (req: AuthRequest, res: Response): Promise<void> => {
     // Step 1: Validate audio file from multer
     if (!req.file) {
       res.status(400).json({ error: 'Audio file is required. Please record again.' });
@@ -367,7 +367,7 @@ export default function chatRoutes(prisma: any) {
   });
 
   // ─── Get Chat History ─────────────────────────────────────────
-  router.get('/history', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  router.get('/history', requireAuth(prisma), async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const messages = await prisma.chatMessage.findMany({
         where: { userId: req.userId },

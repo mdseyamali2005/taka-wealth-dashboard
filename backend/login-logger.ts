@@ -188,14 +188,16 @@ export async function recordLoginActivity(
   loginMethod: string,
   req: Request
 ) {
+  const ip = getClientIp(req);
+  const ua = req.headers['user-agent'] || '';
+  const { browser, os, device } = parseUserAgent(ua);
+  
+  // Get location in background (don't block login response)
+  const locationPromise = getLocationFromIp(ip);
+  let location: string | null = null;
+  
   try {
-    const ip = getClientIp(req);
-    const ua = req.headers['user-agent'] || '';
-    const { browser, os, device } = parseUserAgent(ua);
-
-    // Get location in background (don't block login response)
-    const locationPromise = getLocationFromIp(ip);
-    const location = await locationPromise;
+    location = await locationPromise;
 
     // Save login log to database
     await prisma.loginLog.create({
@@ -229,4 +231,6 @@ export async function recordLoginActivity(
     // Login logging should never block the login flow
     console.error('Login activity logging failed:', error?.message || error);
   }
+  
+  return { ip, location, device, browser, os };
 }

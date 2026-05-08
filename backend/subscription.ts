@@ -31,7 +31,7 @@ export default function subscriptionRoutes(prisma: any) {
   const is_live = process.env.SSLCOMMERZ_IS_LIVE === 'true';
 
   // ─── Create Checkout Session ──────────────────────────────────
-  router.post('/create-checkout', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  router.post('/create-checkout', requireAuth(prisma), async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const user = await prisma.user.findUnique({ where: { id: req.userId } });
       if (!user) {
@@ -135,7 +135,7 @@ export default function subscriptionRoutes(prisma: any) {
   });
 
   // ─── Get Status ───────────────────────────────────────────────
-  router.get('/status', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  router.get('/status', requireAuth(prisma), async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const user = await prisma.user.findUnique({
         where: { id: req.userId },
