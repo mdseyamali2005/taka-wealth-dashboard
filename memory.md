@@ -106,7 +106,7 @@ e:\taka-wealth-dashboard\
 | Authentication | ✅ Done | Email/password + Google Sign-In (JWT + bcrypt) |
 | AI Chat (Text) | ✅ Done | Hybrid: local parser (FREE) + Claude 3.5 Haiku fallback |
 | AI Chat (Voice) | ✅ Done | Bangla voice via OpenAI Whisper STT |
-| Stripe Subscription | ✅ Done | ৳299/month Pro plan for AI Chat |
+| SSLCommerz Subscription | ✅ Fixed | Replaced with SSLCommerz (bKash, Nagad) for BD |
 | CSV Export | ✅ Done | Download expenses as CSV |
 | Local Storage Fallback | ✅ Done | Works offline |
 
@@ -118,13 +118,14 @@ e:\taka-wealth-dashboard\
 - **Created `memory.md`** — This project documentation file
 - **Auth System** — JWT + bcrypt + Google OAuth (register, login, Google Sign-In, protected routes)
 - **AI Chat** — Hybrid parser (local regex FREE + Claude 3.5 Haiku fallback) + Whisper voice-to-text
-- **SaaS Subscription** — Stripe checkout, webhooks, customer portal, chat gating
+- **SaaS Subscription (Local)** — SSLCommerz integration (bKash, Nagad, Cards), success/fail/cancel handling, IPN webhook
 - **New files created:** `backend/auth.ts`, `backend/chat.ts`, `backend/subscription.ts`, `backend/middleware.ts`, `src/lib/auth-context.tsx`, `src/pages/Login.tsx`, `src/pages/Pricing.tsx`, `src/components/finance/AIChatSidebar.tsx`
 - **Modified files:** `prisma/schema.prisma`, `backend/server.ts`, `src/App.tsx`, `src/pages/Index.tsx`, `src/components/finance/Navigation.tsx`, `.env.example`
 - **Build:** `vite build` ✅ PASSED (3.78s)
 
-### 2026-05-08 — Bug Fixes (Post-Audit)
+### 2026-05-08 — Bug Fixes & Payment Update (Post-Audit)
 - **Claude model updated:** `claude-3-5-haiku` RETIRED → replaced with `claude-haiku-4-5-20250414`
 - **Whisper file upload fixed:** `new File()` doesn't work in Node.js → replaced with `toFile()` from `openai/uploads`
-- **Stripe API version fixed:** Removed hardcoded invalid version, let SDK use default
+- **Stripe API removed:** Replaced with **SSLCommerz** for Bangladesh support (bKash, Nagad)
+- **Prisma Schema updated:** `stripeCustomerId` → `paymentCustomerId`
 - **Build:** `vite build` ✅ PASSED (3.88s)

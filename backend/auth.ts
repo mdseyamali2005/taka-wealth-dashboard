@@ -179,7 +179,7 @@ export default function authRoutes(prisma: any) {
           name: true,
           avatarUrl: true,
           subscriptionStatus: true,
-          stripeCustomerId: true,
+          paymentCustomerId: true,
           createdAt: true,
         },
       });

@@ -13,7 +13,6 @@ export default function Pricing({ onNavigate }: Props) {
   const { isSubscribed, user } = useAuth();
   const authFetch = useAuthFetch();
   const [loading, setLoading] = useState(false);
-  const [portalLoading, setPortalLoading] = useState(false);
 
   const handleSubscribe = async () => {
     setLoading(true);
@@ -31,23 +30,6 @@ export default function Pricing({ onNavigate }: Props) {
       alert("Network error. Please try again.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleManage = async () => {
-    setPortalLoading(true);
-    try {
-      const res = await authFetch(`${API_BASE}/subscription/portal`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch {
-      alert("Failed to open billing portal");
-    } finally {
-      setPortalLoading(false);
     }
   };
 
@@ -89,7 +71,7 @@ export default function Pricing({ onNavigate }: Props) {
             <span className="text-4xl font-bold text-foreground">৳299</span>
             <span className="text-muted-foreground text-sm">/month</span>
           </div>
-          <p className="text-xs text-muted-foreground mb-6">Cancel anytime • No hidden fees</p>
+          <p className="text-xs text-muted-foreground mb-6">Payment via bKash, Nagad, Card</p>
 
           <div className="space-y-3 mb-8">
             {features.map(({ icon: Icon, text }) => (
@@ -109,13 +91,6 @@ export default function Pricing({ onNavigate }: Props) {
                 <Check size={16} />
                 You're on the Pro plan!
               </div>
-              <button
-                onClick={handleManage}
-                disabled={portalLoading}
-                className="w-full border border-border text-foreground py-3 rounded-xl font-semibold text-sm hover:bg-secondary transition-all disabled:opacity-50"
-              >
-                {portalLoading ? "Opening..." : "Manage Subscription"}
-              </button>
             </div>
           ) : (
             <button
@@ -129,12 +104,12 @@ export default function Pricing({ onNavigate }: Props) {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Redirecting to checkout...
+                  Redirecting to payment...
                 </>
               ) : (
                 <>
                   <Sparkles size={16} />
-                  Subscribe Now
+                  Pay with bKash/Nagad
                 </>
               )}
             </button>
@@ -143,7 +118,7 @@ export default function Pricing({ onNavigate }: Props) {
       </div>
 
       <p className="text-center text-xs text-muted-foreground/60 mt-6">
-        Secured by Stripe • 256-bit SSL encryption
+        Secured by SSLCommerz • Local Payment Gateway
       </p>
     </div>
   );

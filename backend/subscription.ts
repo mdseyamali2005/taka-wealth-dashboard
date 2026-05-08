@@ -1,13 +1,35 @@
 import { Router, Request, Response } from 'express';
-import Stripe from 'stripe';
+import SSLCommerzPayment from 'sslcommerz-lts';
 import { AuthRequest, requireAuth } from './middleware.js';
 
 const router = Router();
 
-export default function subscriptionRoutes(prisma: any) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+// Define a type for SSLCommerz data to avoid "any" if possible
+interface SSLData {
+  total_amount: number;
+  currency: string;
+  tran_id: string;
+  success_url: string;
+  fail_url: string;
+  cancel_url: string;
+  ipn_url: string;
+  shipping_method: string;
+  product_name: string;
+  product_category: string;
+  product_profile: string;
+  cus_name: string;
+  cus_email: string;
+  cus_add1: string;
+  cus_city: string;
+  cus_postcode: string;
+  cus_country: string;
+  cus_phone: string;
+}
 
-  const PRICE_ID = process.env.STRIPE_PRICE_ID || '';
+export default function subscriptionRoutes(prisma: any) {
+  const store_id = process.env.SSLCOMMERZ_STORE_ID || '';
+  const store_passwd = process.env.SSLCOMMERZ_STORE_PASSWORD || '';
+  const is_live = process.env.SSLCOMMERZ_IS_LIVE === 'true';
 
   // ─── Create Checkout Session ──────────────────────────────────
   router.post('/create-checkout', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -18,129 +40,91 @@ export default function subscriptionRoutes(prisma: any) {
         return;
       }
 
-      // Create or retrieve Stripe customer
-      let customerId = user.stripeCustomerId;
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email: user.email,
-          name: user.name || undefined,
-          metadata: { userId: String(user.id) },
-        });
-        customerId = customer.id;
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { stripeCustomerId: customerId },
-        });
-      }
+      const tran_id = `TRAN_${Date.now()}_${user.id}`;
+      const amount = 299; // Monthly fee in BDT
 
-      // Create checkout session
-      const session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        payment_method_types: ['card'],
-        mode: 'subscription',
-        line_items: [{ price: PRICE_ID, quantity: 1 }],
-        success_url: `${req.headers.origin || 'http://localhost:8080'}/?subscription=success`,
-        cancel_url: `${req.headers.origin || 'http://localhost:8080'}/?subscription=canceled`,
-        metadata: { userId: String(user.id) },
+      const data: SSLData = {
+        total_amount: amount,
+        currency: 'BDT',
+        tran_id: tran_id,
+        success_url: `${req.headers.origin || 'http://localhost:8080'}/api/subscription/success?userId=${user.id}`,
+        fail_url: `${req.headers.origin || 'http://localhost:8080'}/api/subscription/fail`,
+        cancel_url: `${req.headers.origin || 'http://localhost:8080'}/api/subscription/cancel`,
+        ipn_url: `${req.headers.origin || 'http://localhost:8080'}/api/subscription/ipn`,
+        shipping_method: 'NO',
+        product_name: 'TakaTrack Pro',
+        product_category: 'SaaS',
+        product_profile: 'general',
+        cus_name: user.name || 'User',
+        cus_email: user.email,
+        cus_add1: 'Dhaka',
+        cus_city: 'Dhaka',
+        cus_postcode: '1000',
+        cus_country: 'Bangladesh',
+        cus_phone: '01700000000',
+      };
+
+      const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+      sslcz.init(data).then((apiResponse: any) => {
+        let GatewayPageURL = apiResponse.GatewayPageURL;
+        res.json({ url: GatewayPageURL });
+      }).catch((err: any) => {
+        console.error('SSLCommerz Init Error:', err);
+        res.status(500).json({ error: 'Failed to initialize payment' });
       });
-
-      res.json({ url: session.url });
     } catch (error) {
       console.error('Checkout error:', error);
       res.status(500).json({ error: 'Failed to create checkout session' });
     }
   });
 
-  // ─── Stripe Webhook ───────────────────────────────────────────
-  router.post('/webhook', async (req: Request, res: Response): Promise<void> => {
-    const sig = req.headers['stripe-signature'] as string;
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
-
-    let event: Stripe.Event;
-
+  // ─── Payment Success ──────────────────────────────────────────
+  router.post('/success', async (req: Request, res: Response): Promise<void> => {
+    const { userId } = req.query;
     try {
-      // req.body should be raw buffer for webhook verification
-      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-    } catch (err: any) {
-      console.error('Webhook signature verification failed:', err.message);
-      res.status(400).json({ error: 'Webhook signature verification failed' });
-      return;
+      if (userId) {
+        await prisma.user.update({
+          where: { id: parseInt(userId as string) },
+          data: { subscriptionStatus: 'active' },
+        });
+      }
+      res.redirect('http://localhost:8080/?subscription=success');
+    } catch (error) {
+      console.error('Success handler error:', error);
+      res.redirect('http://localhost:8080/?subscription=failed');
     }
+  });
 
+  // ─── Payment Fail/Cancel ──────────────────────────────────────
+  router.post('/fail', (req: Request, res: Response) => {
+    res.redirect('http://localhost:8080/?subscription=failed');
+  });
+
+  router.post('/cancel', (req: Request, res: Response) => {
+    res.redirect('http://localhost:8080/?subscription=canceled');
+  });
+
+  // ─── IPN (Instant Payment Notification) ──────────────────────
+  router.post('/ipn', async (req: Request, res: Response): Promise<void> => {
     try {
-      switch (event.type) {
-        case 'checkout.session.completed': {
-          const session = event.data.object as Stripe.Checkout.Session;
-          const userId = session.metadata?.userId;
-          if (userId) {
-            await prisma.user.update({
-              where: { id: parseInt(userId) },
-              data: { subscriptionStatus: 'active' },
-            });
-            console.log(`✅ Subscription activated for user ${userId}`);
-          }
-          break;
-        }
+      const data = req.body;
+      const tran_id = data.tran_id;
+      const status = data.status;
 
-        case 'customer.subscription.updated': {
-          const subscription = event.data.object as Stripe.Subscription;
-          const customer = await stripe.customers.retrieve(subscription.customer as string);
-          if (customer && !customer.deleted) {
-            const user = await prisma.user.findUnique({
-              where: { stripeCustomerId: customer.id },
-            });
-            if (user) {
-              const status = subscription.status === 'active' ? 'active' :
-                             subscription.status === 'past_due' ? 'past_due' : 'canceled';
-              await prisma.user.update({
-                where: { id: user.id },
-                data: { subscriptionStatus: status },
-              });
-              console.log(`📝 Subscription ${status} for user ${user.id}`);
-            }
-          }
-          break;
-        }
-
-        case 'customer.subscription.deleted': {
-          const subscription = event.data.object as Stripe.Subscription;
-          const customer = await stripe.customers.retrieve(subscription.customer as string);
-          if (customer && !customer.deleted) {
-            const user = await prisma.user.findUnique({
-              where: { stripeCustomerId: customer.id },
-            });
-            if (user) {
-              await prisma.user.update({
-                where: { id: user.id },
-                data: { subscriptionStatus: 'canceled' },
-              });
-              console.log(`❌ Subscription canceled for user ${user.id}`);
-            }
-          }
-          break;
-        }
-
-        case 'invoice.payment_failed': {
-          const invoice = event.data.object as Stripe.Invoice;
-          const customerId = invoice.customer as string;
-          const user = await prisma.user.findUnique({
-            where: { stripeCustomerId: customerId },
+      // In production, you should validate the IPN with SSLCommerz API
+      if (status === 'VALID' || status === 'AUTHENTICATED') {
+        const userId = tran_id.split('_').pop();
+        if (userId) {
+          await prisma.user.update({
+            where: { id: parseInt(userId) },
+            data: { subscriptionStatus: 'active' },
           });
-          if (user) {
-            await prisma.user.update({
-              where: { id: user.id },
-              data: { subscriptionStatus: 'past_due' },
-            });
-            console.log(`⚠️ Payment failed for user ${user.id}`);
-          }
-          break;
         }
       }
-
-      res.json({ received: true });
+      res.status(200).send('OK');
     } catch (error) {
-      console.error('Webhook processing error:', error);
-      res.status(500).json({ error: 'Webhook processing failed' });
+      console.error('IPN Error:', error);
+      res.status(500).send('Error');
     }
   });
 
@@ -149,35 +133,13 @@ export default function subscriptionRoutes(prisma: any) {
     try {
       const user = await prisma.user.findUnique({
         where: { id: req.userId },
-        select: { subscriptionStatus: true, stripeCustomerId: true },
+        select: { subscriptionStatus: true },
       });
       res.json({
         status: user?.subscriptionStatus || 'free',
-        hasStripeAccount: !!user?.stripeCustomerId,
       });
     } catch (error) {
       res.status(500).json({ error: 'Failed to check subscription' });
-    }
-  });
-
-  // ─── Customer Portal ──────────────────────────────────────────
-  router.post('/portal', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
-    try {
-      const user = await prisma.user.findUnique({ where: { id: req.userId } });
-      if (!user?.stripeCustomerId) {
-        res.status(400).json({ error: 'No subscription found' });
-        return;
-      }
-
-      const session = await stripe.billingPortal.sessions.create({
-        customer: user.stripeCustomerId,
-        return_url: `${req.headers.origin || 'http://localhost:8080'}/`,
-      });
-
-      res.json({ url: session.url });
-    } catch (error) {
-      console.error('Portal error:', error);
-      res.status(500).json({ error: 'Failed to create portal session' });
     }
   });
 

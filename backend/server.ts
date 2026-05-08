@@ -36,11 +36,9 @@ const prisma = new PrismaClient({ adapter });
 // Middleware
 app.use(cors());
 
-// Stripe webhook needs raw body — must be BEFORE express.json()
-app.use('/api/subscription/webhook', express.raw({ type: 'application/json' }));
-
-// JSON parsing for all other routes
+// JSON parsing for all routes
 app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true })); // SSLCommerz callbacks often use urlencoded
 
 // Base health route
 app.get('/api/health', async (req: Request, res: Response) => {
