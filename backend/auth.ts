@@ -43,6 +43,17 @@ export default function authRoutes(prisma: any) {
 
       const token = generateToken(user.id, user.email);
 
+      // Save session to database
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); // Match 30d JWT expiry
+      await prisma.session.create({
+        data: {
+          userId: user.id,
+          token,
+          expiresAt,
+        },
+      });
+
       // Log registration activity
       recordLoginActivity(prisma, user.id, user.email, 'register', req);
 
@@ -85,6 +96,17 @@ export default function authRoutes(prisma: any) {
       }
 
       const token = generateToken(user.id, user.email);
+
+      // Save session to database
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); // Match 30d JWT expiry
+      await prisma.session.create({
+        data: {
+          userId: user.id,
+          token,
+          expiresAt,
+        },
+      });
 
       // Log login activity
       recordLoginActivity(prisma, user.id, user.email, 'email', req);
@@ -161,6 +183,17 @@ export default function authRoutes(prisma: any) {
       }
 
       const token = generateToken(user.id, user.email);
+
+      // Save session to database
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); // Match 30d JWT expiry
+      await prisma.session.create({
+        data: {
+          userId: user.id,
+          token,
+          expiresAt,
+        },
+      });
 
       // Log Google login activity
       recordLoginActivity(prisma, user.id, user.email, 'google', req);
