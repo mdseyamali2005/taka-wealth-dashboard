@@ -7,6 +7,7 @@ interface User {
   email: string;
   name: string | null;
   avatarUrl: string | null;
+  budget: number;
   subscriptionStatus: string; // "free" | "active" | "canceled" | "past_due"
 }
 

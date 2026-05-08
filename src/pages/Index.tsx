@@ -18,11 +18,11 @@ import { toast } from "sonner";
 const API_BASE = "http://localhost:3000/api";
 
 export default function Index() {
-  const { token } = useAuth();
+  const { token, user, refreshUser } = useAuth();
   const authFetch = useAuthFetch();
   const [page, setPage] = useState<Page>("dashboard");
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [budget, setBudget] = useState<Budget>(loadBudget);
+  const [budget, setBudget] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   // Fetch from MS SQL Backend (authenticated)
@@ -57,9 +57,12 @@ export default function Index() {
     }
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Save budget to local storage
-  useEffect(() => saveBudget(budget), [budget]);
-  
+  useEffect(() => {
+    if (user && user.budget !== undefined) {
+      setBudget(user.budget);
+    }
+  }, [user]);
+
   // Save expenses to local storage as backup
   useEffect(() => saveExpenses(expenses), [expenses]);
 
@@ -97,9 +100,28 @@ export default function Index() {
     setExpenses((prev) => prev.filter((e) => e.id !== id));
   }, [authFetch]);
 
-  const updateBudget = useCallback((amount: number) => {
-    setBudget({ monthly: amount });
-  }, []);
+  const updateBudget = useCallback(async (amount: number) => {
+    setBudget(amount); // Optimistic UI update
+    
+    if (token) {
+      try {
+        const res = await authFetch(`${API_BASE}/auth/budget`, {
+          method: 'PATCH',
+          body: JSON.stringify({ amount })
+        });
+        if (res.ok) {
+          toast.success("Budget updated securely!");
+          refreshUser();
+        } else {
+          toast.error("Failed to update budget");
+        }
+      } catch {
+        toast.error("Network error while saving budget");
+      }
+    } else {
+      toast.info("Login to save budget to database");
+    }
+  }, [authFetch, refreshUser, token]);
 
   // Refresh expenses when AI chat adds one
   const handleExpenseAdded = useCallback(() => {
@@ -112,7 +134,7 @@ export default function Index() {
     
     switch (page) {
       case "dashboard":
-        return <Dashboard expenses={expenses} budget={budget.monthly} onNavigate={setPage} />;
+        return <Dashboard expenses={expenses} budget={budget} onNavigate={setPage} />;
       case "add":
         return <AddExpense onAdd={addExpense} onNavigate={setPage} />;
       case "history":
@@ -120,7 +142,7 @@ export default function Index() {
       case "report":
         return <MonthlyReport expenses={expenses} />;
       case "budget":
-        return <BudgetManager budget={budget.monthly} onSetBudget={updateBudget} expenses={expenses} />;
+        return <BudgetManager budget={budget} onSetBudget={updateBudget} expenses={expenses} />;
       case "chat":
         return (
           <AIChatSidebar

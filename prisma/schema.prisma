@@ -17,6 +17,7 @@ model User {
   password           String        // bcrypt hash (nullable for Google-only users)
   googleId           String?
   avatarUrl          String?
+  budget             Float         @default(0)
   subscriptionStatus String        @default("free") // "free" | "active" | "canceled" | "past_due"
   paymentCustomerId  String?
   createdAt          DateTime      @default(now())

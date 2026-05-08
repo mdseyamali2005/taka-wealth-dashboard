@@ -69,6 +69,7 @@ export default function authRoutes(prisma: any) {
           email: user.email,
           name: user.name,
           avatarUrl: user.avatarUrl,
+          budget: user.budget,
           subscriptionStatus: user.subscriptionStatus,
         },
       });
@@ -128,6 +129,7 @@ export default function authRoutes(prisma: any) {
           email: user.email,
           name: user.name,
           avatarUrl: user.avatarUrl,
+          budget: user.budget,
           subscriptionStatus: user.subscriptionStatus,
         },
       });
@@ -220,6 +222,7 @@ export default function authRoutes(prisma: any) {
           email: user.email,
           name: user.name,
           avatarUrl: user.avatarUrl,
+          budget: user.budget,
           subscriptionStatus: user.subscriptionStatus,
         },
       });
@@ -239,6 +242,7 @@ export default function authRoutes(prisma: any) {
           email: true,
           name: true,
           avatarUrl: true,
+          budget: true,
           subscriptionStatus: true,
           paymentCustomerId: true,
           createdAt: true,
@@ -254,6 +258,25 @@ export default function authRoutes(prisma: any) {
     } catch (error) {
       console.error('Get user error:', error);
       res.status(500).json({ error: 'Failed to get user info' });
+    }
+  });
+
+  // ─── Update Budget ───────────────────────────────────────────
+  router.patch('/budget', requireAuth(prisma), async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const { amount } = req.body;
+      if (typeof amount !== 'number') {
+        res.status(400).json({ error: 'Budget amount is required and must be a number' });
+        return;
+      }
+      const user = await prisma.user.update({
+        where: { id: req.userId },
+        data: { budget: amount },
+      });
+      res.json({ success: true, budget: user.budget });
+    } catch (error) {
+      console.error('Update budget error:', error);
+      res.status(500).json({ error: 'Failed to update budget' });
     }
   });
 
