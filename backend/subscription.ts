@@ -4,7 +4,6 @@ import { AuthRequest, requireAuth } from './middleware.js';
 
 const router = Router();
 
-// Define a type for SSLCommerz data to avoid "any" if possible
 interface SSLData {
   total_amount: number;
   currency: string;
@@ -41,16 +40,16 @@ export default function subscriptionRoutes(prisma: any) {
       }
 
       const tran_id = `TRAN_${Date.now()}_${user.id}`;
-      const amount = 299; // Monthly fee in BDT
+      const amount = 299;
 
       const data: SSLData = {
         total_amount: amount,
         currency: 'BDT',
         tran_id: tran_id,
-        success_url: `${req.headers.origin || 'http://localhost:8080'}/api/subscription/success?userId=${user.id}`,
-        fail_url: `${req.headers.origin || 'http://localhost:8080'}/api/subscription/fail`,
-        cancel_url: `${req.headers.origin || 'http://localhost:8080'}/api/subscription/cancel`,
-        ipn_url: `${req.headers.origin || 'http://localhost:8080'}/api/subscription/ipn`,
+        success_url: `http://localhost:3000/api/subscription/success?userId=${user.id}`,
+        fail_url: `http://localhost:3000/api/subscription/fail`,
+        cancel_url: `http://localhost:3000/api/subscription/cancel`,
+        ipn_url: `http://localhost:3000/api/subscription/ipn`,
         shipping_method: 'NO',
         product_name: 'TakaTrack Pro',
         product_category: 'SaaS',
@@ -79,7 +78,7 @@ export default function subscriptionRoutes(prisma: any) {
   });
 
   // ─── Payment Success ──────────────────────────────────────────
-  router.post('/success', async (req: Request, res: Response): Promise<void> => {
+  const handleSuccess = async (req: Request, res: Response): Promise<void> => {
     const { userId } = req.query;
     try {
       if (userId) {
@@ -93,25 +92,32 @@ export default function subscriptionRoutes(prisma: any) {
       console.error('Success handler error:', error);
       res.redirect('http://localhost:8080/?subscription=failed');
     }
-  });
+  };
+
+  router.post('/success', handleSuccess);
+  router.get('/success', handleSuccess);
 
   // ─── Payment Fail/Cancel ──────────────────────────────────────
-  router.post('/fail', (req: Request, res: Response) => {
+  const handleFail = (req: Request, res: Response) => {
     res.redirect('http://localhost:8080/?subscription=failed');
-  });
+  };
 
-  router.post('/cancel', (req: Request, res: Response) => {
+  const handleCancel = (req: Request, res: Response) => {
     res.redirect('http://localhost:8080/?subscription=canceled');
-  });
+  };
 
-  // ─── IPN (Instant Payment Notification) ──────────────────────
+  router.post('/fail', handleFail);
+  router.get('/fail', handleFail);
+  router.post('/cancel', handleCancel);
+  router.get('/cancel', handleCancel);
+
+  // ─── IPN ──────────────────────────────────────────────────────
   router.post('/ipn', async (req: Request, res: Response): Promise<void> => {
     try {
       const data = req.body;
-      const tran_id = data.tran_id;
       const status = data.status;
+      const tran_id = data.tran_id;
 
-      // In production, you should validate the IPN with SSLCommerz API
       if (status === 'VALID' || status === 'AUTHENTICATED') {
         const userId = tran_id.split('_').pop();
         if (userId) {
@@ -128,16 +134,14 @@ export default function subscriptionRoutes(prisma: any) {
     }
   });
 
-  // ─── Get Subscription Status ──────────────────────────────────
+  // ─── Get Status ───────────────────────────────────────────────
   router.get('/status', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const user = await prisma.user.findUnique({
         where: { id: req.userId },
         select: { subscriptionStatus: true },
       });
-      res.json({
-        status: user?.subscriptionStatus || 'free',
-      });
+      res.json({ status: user?.subscriptionStatus || 'free' });
     } catch (error) {
       res.status(500).json({ error: 'Failed to check subscription' });
     }

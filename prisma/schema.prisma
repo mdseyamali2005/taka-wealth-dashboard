@@ -15,10 +15,10 @@ model User {
   email              String        @unique
   name               String?
   password           String        // bcrypt hash (nullable for Google-only users)
-  googleId           String?       @unique
+  googleId           String?
   avatarUrl          String?
   subscriptionStatus String        @default("free") // "free" | "active" | "canceled" | "past_due"
-  paymentCustomerId  String?       @unique
+  paymentCustomerId  String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   transactions       Transaction[]
