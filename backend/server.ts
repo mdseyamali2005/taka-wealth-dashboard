@@ -3,6 +3,10 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaMssql } from '@prisma/adapter-mssql';
 import { PrismaClient } from '../generated/prisma/client.js';
+import { AuthRequest, requireAuth } from './middleware.js';
+import authRoutes from './auth.js';
+import chatRoutes from './chat.js';
+import subscriptionRoutes from './subscription.js';
 
 dotenv.config();
 
@@ -31,12 +35,16 @@ const prisma = new PrismaClient({ adapter });
 
 // Middleware
 app.use(cors());
+
+// Stripe webhook needs raw body — must be BEFORE express.json()
+app.use('/api/subscription/webhook', express.raw({ type: 'application/json' }));
+
+// JSON parsing for all other routes
 app.use(express.json({ limit: '10kb' }));
 
 // Base health route
 app.get('/api/health', async (req: Request, res: Response) => {
   try {
-    // Quick DB ping to check connection
     await prisma.$queryRaw`SELECT 1`;
     res.status(200).json({ status: 'ok', db: 'connected', timestamp: new Date() });
   } catch (error) {
@@ -44,19 +52,20 @@ app.get('/api/health', async (req: Request, res: Response) => {
   }
 });
 
-// Transactions API
-app.get('/api/transactions', async (req: Request, res: Response) => {
-  try {
-    // Auto-create/find user for demo purposes
-    let user = await prisma.user.findFirst();
-    if (!user) {
-      user = await prisma.user.create({
-        data: { email: 'admin@takatrack.local', password: 'hash' }
-      });
-    }
+// ─── Auth Routes ────────────────────────────────────────────────
+app.use('/api/auth', authRoutes(prisma));
 
+// ─── Chat Routes ────────────────────────────────────────────────
+app.use('/api/chat', chatRoutes(prisma));
+
+// ─── Subscription Routes ────────────────────────────────────────
+app.use('/api/subscription', subscriptionRoutes(prisma));
+
+// ─── Transaction Routes (now auth-protected) ────────────────────
+app.get('/api/transactions', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
     const transactions = await prisma.transaction.findMany({
-      where: { userId: user.id },
+      where: { userId: req.userId },
       orderBy: { date: 'desc' }
     });
     res.json(transactions);
@@ -66,17 +75,9 @@ app.get('/api/transactions', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/transactions', async (req: Request, res: Response) => {
+app.post('/api/transactions', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { amount, description, type, date } = req.body;
-    
-    // Auto-create user if not exists (for demo purposes)
-    let user = await prisma.user.findFirst();
-    if (!user) {
-      user = await prisma.user.create({
-        data: { email: 'admin@takatrack.local', password: 'hash' }
-      });
-    }
 
     const transaction = await prisma.transaction.create({
       data: {
@@ -84,7 +85,7 @@ app.post('/api/transactions', async (req: Request, res: Response) => {
         description,
         type,
         date: new Date(date),
-        userId: user.id
+        userId: req.userId!
       }
     });
     res.status(201).json(transaction);
@@ -94,9 +95,15 @@ app.post('/api/transactions', async (req: Request, res: Response) => {
   }
 });
 
-app.delete('/api/transactions/:id', async (req: Request, res: Response) => {
+app.delete('/api/transactions/:id', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    // Ensure user can only delete their own transactions
+    const tx = await prisma.transaction.findUnique({ where: { id: Number(id) } });
+    if (!tx || tx.userId !== req.userId) {
+      res.status(404).json({ error: 'Transaction not found' });
+      return;
+    }
     await prisma.transaction.delete({ where: { id: Number(id) } });
     res.json({ success: true });
   } catch (error) {

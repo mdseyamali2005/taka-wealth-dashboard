@@ -5,43 +5,56 @@ import AddExpense from "@/components/finance/AddExpense";
 import ExpenseHistory from "@/components/finance/ExpenseHistory";
 import MonthlyReport from "@/components/finance/MonthlyReport";
 import BudgetManager from "@/components/finance/BudgetManager";
+import AIChatSidebar from "@/components/finance/AIChatSidebar";
+import Pricing from "@/pages/Pricing";
 import {
   type Expense, type Budget,
   loadExpenses, saveExpenses, loadBudget, saveBudget,
 } from "@/lib/finance-utils";
+import { useAuth, useAuthFetch } from "@/lib/auth-context";
 import { toast } from "sonner";
 
+const API_BASE = "http://localhost:3000/api";
+
 export default function Index() {
+  const { token } = useAuth();
+  const authFetch = useAuthFetch();
   const [page, setPage] = useState<Page>("dashboard");
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budget, setBudget] = useState<Budget>(loadBudget);
   const [loading, setLoading] = useState(true);
 
-  // Fetch from MS SQL Backend
+  // Fetch from MS SQL Backend (authenticated)
+  const fetchTransactions = useCallback(async () => {
+    try {
+      const res = await authFetch(`${API_BASE}/transactions`);
+      if (!res.ok) throw new Error("Backend error");
+      const data = await res.json();
+      const formatted = data.map((t: any) => ({
+        id: String(t.id),
+        amount: t.amount,
+        category: t.description.split(' - ')[0] || 'Other',
+        note: t.description.split(' - ')[1] || t.description,
+        date: t.date.split('T')[0],
+        createdAt: new Date(t.date).getTime()
+      }));
+      setExpenses(formatted);
+    } catch (err) {
+      console.log("Using local storage fallback. Ensure backend is running.", err);
+      setExpenses(loadExpenses());
+    } finally {
+      setLoading(false);
+    }
+  }, [authFetch]);
+
   useEffect(() => {
-    fetch('http://localhost:3000/api/transactions')
-      .then(res => {
-        if (!res.ok) throw new Error("Backend error");
-        return res.json();
-      })
-      .then(data => {
-         const formatted = data.map((t: any) => ({
-           id: String(t.id),
-           amount: t.amount,
-           category: t.description.split(' - ')[0] || 'Other',
-           note: t.description.split(' - ')[1] || t.description,
-           date: t.date.split('T')[0],
-           createdAt: new Date(t.date).getTime()
-         }));
-         setExpenses(formatted);
-         setLoading(false);
-      })
-      .catch((err) => {
-         console.log("Using local storage fallback. Ensure backend is running.", err);
-         setExpenses(loadExpenses());
-         setLoading(false);
-      });
-  }, []);
+    if (token) {
+      fetchTransactions();
+    } else {
+      setExpenses(loadExpenses());
+      setLoading(false);
+    }
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Save budget to local storage
   useEffect(() => saveBudget(budget), [budget]);
@@ -51,9 +64,8 @@ export default function Index() {
 
   const addExpense = useCallback(async (e: Expense) => {
     try {
-      const res = await fetch('http://localhost:3000/api/transactions', {
+      const res = await authFetch(`${API_BASE}/transactions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: e.amount,
           description: `${e.category} - ${e.note}`,
@@ -73,20 +85,26 @@ export default function Index() {
     }
     // Fallback
     setExpenses((prev) => [...prev, e]);
-  }, []);
+  }, [authFetch]);
 
   const deleteExpense = useCallback(async (id: string) => {
     try {
-      await fetch(`http://localhost:3000/api/transactions/${id}`, { method: 'DELETE' });
+      await authFetch(`${API_BASE}/transactions/${id}`, { method: 'DELETE' });
     } catch {
       console.warn("Backend unavailable for deletion");
     }
     setExpenses((prev) => prev.filter((e) => e.id !== id));
-  }, []);
+  }, [authFetch]);
 
   const updateBudget = useCallback((amount: number) => {
     setBudget({ monthly: amount });
   }, []);
+
+  // Refresh expenses when AI chat adds one
+  const handleExpenseAdded = useCallback(() => {
+    fetchTransactions();
+    toast.success("Expense added via AI Chat!");
+  }, [fetchTransactions]);
 
   const renderPage = () => {
     if (loading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Connecting to database...</div>;
@@ -102,6 +120,15 @@ export default function Index() {
         return <MonthlyReport expenses={expenses} />;
       case "budget":
         return <BudgetManager budget={budget.monthly} onSetBudget={updateBudget} expenses={expenses} />;
+      case "chat":
+        return (
+          <AIChatSidebar
+            onExpenseAdded={handleExpenseAdded}
+            onUpgrade={() => setPage("pricing")}
+          />
+        );
+      case "pricing":
+        return <Pricing onNavigate={setPage} />;
     }
   };
 
