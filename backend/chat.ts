@@ -96,8 +96,11 @@ User: "How much did I spend this month?"
 → {"type":"chat","message":"I can see your expenses in the dashboard! Check the Monthly Report tab for a full breakdown."}`;
 
 export default function chatRoutes(prisma: any) {
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const router = Router();
+
+  // Initialize clients with fallback so server doesn't crash on boot if keys are missing
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || 'dummy_key_to_prevent_crash' });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'dummy_key_to_prevent_crash' });
 
   // ─── Send Text Message ────────────────────────────────────────
   router.post('/message', requireAuth(prisma), requireSubscription(prisma), async (req: AuthRequest, res: Response): Promise<void> => {
