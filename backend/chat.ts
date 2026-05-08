@@ -212,28 +212,67 @@ export default function chatRoutes(prisma: any) {
 
   // ─── Voice Message (Whisper STT → Claude) ─────────────────────
   router.post('/voice', requireAuth, requireSubscription(prisma), upload.single('audio'), async (req: AuthRequest, res: Response): Promise<void> => {
+    // Step 1: Validate audio file from multer
+    if (!req.file) {
+      res.status(400).json({ error: 'Audio file is required. Please record again.' });
+      return;
+    }
+
+    if (!req.file.buffer || req.file.buffer.length === 0) {
+      console.error('Voice error: req.file exists but buffer is empty/missing. Keys:', Object.keys(req.file));
+      res.status(400).json({ error: 'Audio file is empty. Please record for at least 1-2 seconds.' });
+      return;
+    }
+
+    console.log(`Voice: received ${req.file.buffer.length} bytes, mimetype: ${req.file.mimetype}`);
+
+    // Step 2: Check OpenAI API key
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('Voice error: OPENAI_API_KEY is not set in .env');
+      res.status(500).json({ error: 'Voice service not configured. OPENAI_API_KEY missing in .env' });
+      return;
+    }
+
+    // Step 3: Convert buffer to file and transcribe with Whisper
+    let transcribedText: string;
     try {
-      if (!req.file) {
-        res.status(400).json({ error: 'Audio file is required' });
-        return;
-      }
+      const audioFile = await toFile(req.file.buffer, 'audio.webm', { type: req.file.mimetype || 'audio/webm' });
 
-      // Convert buffer to File-like object using OpenAI's toFile helper
-      const audioFile = await toFile(req.file.buffer, 'audio.webm', { type: req.file.mimetype });
-
-      // Transcribe with Whisper
       const transcription = await openai.audio.transcriptions.create({
         model: 'whisper-1',
         file: audioFile,
         language: 'bn', // Bengali/Bangla
       });
 
-      const transcribedText = transcription.text;
-      if (!transcribedText || !transcribedText.trim()) {
-        res.status(400).json({ error: 'Could not transcribe audio. Please try again.' });
-        return;
-      }
+      transcribedText = transcription.text;
+    } catch (whisperError: any) {
+      const errMsg = whisperError?.message || String(whisperError);
+      const statusCode = whisperError?.status || whisperError?.statusCode;
+      console.error('Voice Whisper error:', { message: errMsg, status: statusCode, type: whisperError?.type });
 
+      if (statusCode === 401 || errMsg.includes('API key')) {
+        res.status(500).json({ error: 'OpenAI API key is invalid. Please check OPENAI_API_KEY in .env' });
+      } else if (statusCode === 429) {
+        res.status(429).json({ error: 'OpenAI rate limit reached. Please wait a moment and try again.' });
+      } else if (statusCode === 402 || errMsg.includes('quota') || errMsg.includes('billing')) {
+        res.status(402).json({ error: 'OpenAI account has no credits. Please add billing at platform.openai.com' });
+      } else if (errMsg.includes('Could not process') || errMsg.includes('Invalid file')) {
+        res.status(400).json({ error: 'Audio format not supported. Try speaking clearly for 2+ seconds.' });
+      } else {
+        res.status(500).json({ error: `Whisper transcription failed: ${errMsg.substring(0, 100)}` });
+      }
+      return;
+    }
+
+    if (!transcribedText || !transcribedText.trim()) {
+      res.status(400).json({ error: 'Could not understand audio. Please speak clearly and try again.' });
+      return;
+    }
+
+    console.log(`Voice: transcribed text: "${transcribedText}"`);
+
+    // Step 4: Process the transcribed text (same as text chat)
+    try {
       // Save the transcribed text as user message
       await prisma.chatMessage.create({
         data: { userId: req.userId!, role: 'user', content: `🎤 ${transcribedText}` },
@@ -321,9 +360,9 @@ export default function chatRoutes(prisma: any) {
         });
         res.json({ type: 'chat', transcription: transcribedText, message: aiText });
       }
-    } catch (error) {
-      console.error('Voice chat error:', error);
-      res.status(500).json({ error: 'Voice processing failed' });
+    } catch (processError: any) {
+      console.error('Voice processing error (post-transcription):', processError?.message || processError);
+      res.status(500).json({ error: `Failed to process voice text: ${(processError?.message || 'Unknown error').substring(0, 100)}` });
     }
   });
 

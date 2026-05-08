@@ -94,11 +94,28 @@ export default function AIChatSidebar({ onExpenseAdded, onUpgrade }: Props) {
     }
   }, [input, loading, authFetch, onExpenseAdded]);
 
-  // Voice recording
+  // Voice recording — detect supported MIME types with fallback
+  const getSupportedMimeType = () => {
+    const types = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/ogg;codecs=opus",
+      "audio/mp4",
+      "audio/wav",
+    ];
+    for (const type of types) {
+      if (MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return ""; // Let browser choose default
+  };
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+
+      const mimeType = getSupportedMimeType();
+      const options: MediaRecorderOptions = mimeType ? { mimeType } : {};
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
@@ -108,7 +125,8 @@ export default function AIChatSidebar({ onExpenseAdded, onUpgrade }: Props) {
 
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const actualType = mimeType || mediaRecorder.mimeType || "audio/webm";
+        const blob = new Blob(chunksRef.current, { type: actualType });
         await sendVoice(blob);
       };
 
@@ -119,8 +137,13 @@ export default function AIChatSidebar({ onExpenseAdded, onUpgrade }: Props) {
       timerRef.current = setInterval(() => {
         setRecordingTime((t) => t + 1);
       }, 1000);
-    } catch {
-      alert("Microphone access denied. Please allow microphone permission.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("NotAllowed") || msg.includes("Permission")) {
+        alert("Microphone access denied. Please allow microphone permission.");
+      } else {
+        alert(`Could not start recording: ${msg}`);
+      }
     }
   };
 
@@ -136,6 +159,15 @@ export default function AIChatSidebar({ onExpenseAdded, onUpgrade }: Props) {
   };
 
   const sendVoice = async (blob: Blob) => {
+    // Validate blob before sending
+    if (!blob || blob.size < 100) {
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now(), role: "assistant", content: "❌ Recording too short. Please hold the mic button and speak for at least 2 seconds." },
+      ]);
+      return;
+    }
+
     setLoading(true);
     const userMsg: ChatMsg = {
       id: Date.now(),
@@ -146,7 +178,9 @@ export default function AIChatSidebar({ onExpenseAdded, onUpgrade }: Props) {
 
     try {
       const formData = new FormData();
-      formData.append("audio", blob, "recording.webm");
+      // Use the actual blob type for proper file extension
+      const ext = blob.type.includes("mp4") ? "mp4" : blob.type.includes("ogg") ? "ogg" : "webm";
+      formData.append("audio", blob, `recording.${ext}`);
 
       const res = await authFetch(`${API_BASE}/chat/voice`, {
         method: "POST",
@@ -154,6 +188,22 @@ export default function AIChatSidebar({ onExpenseAdded, onUpgrade }: Props) {
       });
 
       const data = await res.json();
+
+      // Check for error responses from backend
+      if (!res.ok) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === userMsg.id
+              ? { ...m, content: "🎤 Voice message" }
+              : m
+          )
+        );
+        setMessages((prev) => [
+          ...prev,
+          { id: Date.now() + 1, role: "assistant", content: `❌ ${data.error || "Voice processing failed"}` },
+        ]);
+        return;
+      }
 
       // Update user message with transcription
       setMessages((prev) =>
@@ -167,7 +217,7 @@ export default function AIChatSidebar({ onExpenseAdded, onUpgrade }: Props) {
       const assistantMsg: ChatMsg = {
         id: Date.now() + 1,
         role: "assistant",
-        content: data.message || data.error || "Could not process voice",
+        content: data.message || "Could not process voice",
         expense: data.expense,
       };
       setMessages((prev) => [...prev, assistantMsg]);
@@ -175,10 +225,11 @@ export default function AIChatSidebar({ onExpenseAdded, onUpgrade }: Props) {
       if (data.type === "expense" && onExpenseAdded) {
         onExpenseAdded();
       }
-    } catch {
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Unknown error";
       setMessages((prev) => [
         ...prev,
-        { id: Date.now() + 1, role: "assistant", content: "❌ Voice processing failed. Try again." },
+        { id: Date.now() + 1, role: "assistant", content: `❌ Network error: ${errMsg}. Check if backend is running.` },
       ]);
     } finally {
       setLoading(false);
