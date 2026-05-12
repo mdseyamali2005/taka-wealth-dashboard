@@ -7,6 +7,7 @@ import { AuthRequest, requireAuth } from './middleware.js';
 import authRoutes from './auth.js';
 import chatRoutes from './chat.js';
 import subscriptionRoutes from './subscription.js';
+import adminRoutes from './admin.js';
 
 dotenv.config();
 
@@ -58,6 +59,9 @@ app.use('/api/chat', chatRoutes(prisma));
 
 // ─── Subscription Routes ────────────────────────────────────────
 app.use('/api/subscription', subscriptionRoutes(prisma));
+
+// ─── Admin Routes ───────────────────────────────────────────────
+app.use('/api/admin', adminRoutes(prisma));
 
 // ─── Transaction Routes (now auth-protected) ────────────────────
 app.get('/api/transactions', requireAuth(prisma), async (req: AuthRequest, res: Response) => {

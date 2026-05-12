@@ -101,6 +101,15 @@ export default function authRoutes(prisma: any) {
         return;
       }
 
+      // Check if user is banned
+      if (user.isBanned) {
+        res.status(403).json({
+          error: 'Account suspended',
+          message: user.banReason || 'Your account has been suspended. Contact support for help.',
+        });
+        return;
+      }
+
       const token = generateToken(user.id, user.email);
 
       // Log login activity & get device info
@@ -192,6 +201,15 @@ export default function authRoutes(prisma: any) {
             avatarUrl: picture || null,
           },
         });
+      }
+
+      // Check if existing user is banned
+      if (user.isBanned) {
+        res.status(403).json({
+          error: 'Account suspended',
+          message: user.banReason || 'Your account has been suspended. Contact support for help.',
+        });
+        return;
       }
 
       const token = generateToken(user.id, user.email);

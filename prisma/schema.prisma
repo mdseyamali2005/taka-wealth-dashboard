@@ -20,12 +20,27 @@ model User {
   budget             Float         @default(0)
   subscriptionStatus String        @default("free") // "free" | "active" | "canceled" | "past_due"
   paymentCustomerId  String?
+  isBanned           Boolean       @default(false)
+  bannedAt           DateTime?
+  banReason          String?
+  bannedBy           Int?          // Admin ID who banned
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   transactions       Transaction[]
   sessions           Session[]
   chatMessages       ChatMessage[]
   loginLogs          LoginLog[]
+}
+
+model Admin {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String
+  password  String   // bcrypt hash
+  role      String   @default("admin") // "admin" | "superadmin"
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Transaction {
