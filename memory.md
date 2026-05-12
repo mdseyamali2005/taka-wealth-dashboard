@@ -1,6 +1,6 @@
 # TakaTrack — Project Memory
 
-> **Last Updated:** 2026-05-08
+> **Last Updated:** 2026-05-12
 > This file is a living document. It tracks the project's architecture, features, and change history.
 
 ---
@@ -35,14 +35,15 @@ e:\taka-wealth-dashboard\
 ├── backend/
 │   ├── server.ts          # Express server entry point
 │   ├── auth.ts            # Auth routes (register, login, Google OAuth, login-activity)
+│   ├── admin.ts           # Admin routes (register, login, user mgmt, ban/unban, stats)
 │   ├── chat.ts            # AI chat routes (Claude + Whisper voice)
 │   ├── login-logger.ts    # Login activity logger + IP geolocation + email alerts
 │   ├── subscription.ts    # SSLCommerz subscription routes
-│   └── middleware.ts       # JWT auth & subscription middleware
+│   └── middleware.ts      # JWT auth, admin auth & subscription middleware
 ├── prisma/
-│   └── schema.prisma      # Database models (User, Transaction, Session, ChatMessage)
+│   └── schema.prisma      # Database models (User, Admin, Transaction, Session, etc.)
 ├── src/
-│   ├── App.tsx            # Root component with routing & auth provider
+│   ├── App.tsx            # Root component with routing (user + admin)
 │   ├── main.tsx           # Vite entry
 │   ├── index.css          # Global Tailwind styles & design tokens
 │   ├── components/
@@ -59,10 +60,13 @@ e:\taka-wealth-dashboard\
 │   ├── lib/
 │   │   ├── utils.ts           # General utilities
 │   │   ├── finance-utils.ts   # Finance helpers, types, formatters
-│   │   └── auth-context.tsx   # React auth context & provider
+│   │   ├── auth-context.tsx   # React user auth context & provider
+│   │   └── admin-context.tsx  # React admin auth context & provider
 │   ├── pages/
 │   │   ├── Index.tsx      # Main app shell
-│   │   ├── Login.tsx      # Login/Register page
+│   │   ├── Login.tsx      # User Login/Register page
+│   │   ├── AdminLogin.tsx # Admin Login/Register page
+│   │   ├── AdminPanel.tsx # Admin panel (dashboard, users, activity)
 │   │   ├── Pricing.tsx    # Subscription pricing page
 │   │   └── NotFound.tsx   # 404 page
 │   └── hooks/
@@ -93,8 +97,8 @@ e:\taka-wealth-dashboard\
 | `SMTP_USER` | SMTP username/email | Your Gmail address |
 | `SMTP_PASS` | SMTP password | Gmail App Password (16-char) |
 | `SMTP_FROM` | Sender email | Same as SMTP_USER |
+| `ADMIN_JWT_SECRET` | Admin JWT signing secret | Generate random 64-char string |
 | `VITE_GOOGLE_CLIENT_ID` | Google client ID (frontend) | Same as GOOGLE_CLIENT_ID |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key | Stripe Dashboard |
 
 ---
 
@@ -115,6 +119,12 @@ e:\taka-wealth-dashboard\
 | Login Email Alerts | ✅ Done | Sends email on every new login (nodemailer SMTP) |
 | CSV Export | ✅ Done | Download expenses as CSV |
 | Local Storage Fallback | ✅ Done | Works offline |
+| **Admin Panel** | ✅ Done | Separate login, dashboard stats, user management |
+| Admin User Ban/Unban | ✅ Done | Instant ban with reason, session revocation |
+| Admin User Delete | ✅ Done | Cascading delete (all related data) |
+| Admin Activity Log | ✅ Done | Cross-user login activity feed |
+| Admin Subscription Mgmt | ✅ Done | Override user plan (free/pro/canceled) |
+| Banned User Blocking | ✅ Done | Blocked at login + middleware level |
 
 ---
 
@@ -154,3 +164,13 @@ e:\taka-wealth-dashboard\
 - **Dependencies:** Added `nodemailer` + `@types/nodemailer`
 - **Env:** Added `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` to `.env.example`
 - **Build:** `vite build` ✅ PASSED (3.72s)
+
+### 2026-05-12 — Admin Panel 🛡️
+- **Prisma Schema:** Added `Admin` model (separate table) + `isBanned`, `bannedAt`, `banReason`, `bannedBy` fields to `User`
+- **Admin Backend:** New `backend/admin.ts` — register, login, /me, dashboard stats, user CRUD, ban/unban, delete, activity feed, subscription override
+- **Admin Middleware:** New `requireAdmin()` middleware with separate `ADMIN_JWT_SECRET`
+- **Admin Frontend:** New `AdminLogin.tsx` (red/dark theme), `AdminPanel.tsx` (dashboard + users + activity tabs), `admin-context.tsx`
+- **Ban System:** Users are blocked at login (`auth.ts`) and at middleware level (`requireAuth`). Sessions revoked on ban.
+- **Routes:** `/admin/login` (admin auth), `/admin` (admin panel, protected)
+- **Env:** Added `ADMIN_JWT_SECRET` to `.env.example`
+- **Build:** `vite build` ✅ PASSED (4.24s)
